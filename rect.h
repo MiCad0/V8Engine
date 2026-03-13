@@ -2,12 +2,11 @@
 // Created by MiCad0 on 13/03/2026.
 //
 
-#ifndef V8ENGINE_SQUARE_H
-#define V8ENGINE_SQUARE_H
+#ifndef V8ENGINE_RECT_H
+#define V8ENGINE_RECT_H
 #include <array>
 #include <vector>
-#include <GLFW/glfw3.h>
-#include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 
 
@@ -39,15 +38,15 @@ struct Vertex {
     }
 };
 
-class square {
+class rect {
 public:
-    square(): vertices{
+    rect(): vertices{
         {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
         {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
         {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
         {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}}
     } {}
-    square(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const glm::vec3 d): vertices{{a, {1.0f, 1.0f, 1.0f}}, {b,{1.0f, 1.0f, 1.0f}}, {c,{1.0f, 1.0f, 1.0f}}, {{1.0f, 1.0f, 1.0f}, d}} {}
+    rect(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const glm::vec3 d): vertices{{a, {1.0f, 1.0f, 1.0f}}, {b,{1.0f, 1.0f, 1.0f}}, {c,{1.0f, 1.0f, 1.0f}}, {d, {1.0f, 1.0f, 1.0f}}} {}
 
     void move_to(const glm::vec3 dest) {
         const auto dir = dest - vertices[0].pos;
@@ -82,4 +81,4 @@ private:
 };
 
 
-#endif //V8ENGINE_SQUARE_H
+#endif //V8ENGINE_RECT_H
