@@ -12,7 +12,7 @@ _deps
 CMakeUserPresets.json
 .idea
 shaders/*.spv
-unused/*
+unused
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
