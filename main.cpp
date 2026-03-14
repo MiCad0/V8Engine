@@ -4,7 +4,9 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <array>
+#include <chrono>
 #include <GLFW/glfw3.h>
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
@@ -15,14 +17,15 @@
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
 
-const uint32_t WIDTH{1920};
-const uint32_t HEIGHT{1080};
+constexpr uint32_t WIDTH{1920};
+constexpr uint32_t HEIGHT{1080};
+constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
 
-    bool isComplete() {
+    [[nodiscard]] bool isComplete() const {
         return graphicsFamily.has_value() && presentFamily.has_value();
     }
 };
@@ -77,6 +80,18 @@ private:
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
+    glm::vec3 cameraPos{0.0f, 0.0f, 4.0f};
+    glm::vec3 cameraFront{0.0f, 0.0f, -1.0f};
+    glm::vec3 cameraUp{0.0f, 1.0f, 0.0f};
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
+    float yaw = -90.0f;
+    float pitch = 0.0f;
+    bool firstMouse = true;
+    double lastX = WIDTH / 2.0;
+    double lastY = HEIGHT / 2.0;
+    float frameTimer = 0.0f;
+    int frameCount = 0;
 
 
     const std::vector<char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -90,12 +105,16 @@ private:
 
         glfwSetWindowUserPointer(window, this);
         glfwSetKeyCallback(window, key_callback);
+
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+        if (glfwRawMouseMotionSupported())
+            glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     }
 
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
     {
-        auto app = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window));
-        if (app && key >= 0 && key < GLFW_KEY_LAST) {
+        if (const auto app = static_cast<Engine*>(glfwGetWindowUserPointer(window)); app && key >= 0 && key < GLFW_KEY_LAST) {
             if (action == GLFW_PRESS) app->keys[key] = true;
             else if (action == GLFW_RELEASE) app->keys[key] = false;
         }
@@ -120,7 +139,7 @@ private:
         createSyncObjects();
     }
 
-    void cleanup() {
+    void cleanup() const {
         for (auto renderFinishedSemaphore: renderFinishedSemaphores) vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
         for (auto imageAvailableSemaphore: imageAvailableSemaphores)vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
         for (auto inFlightFence: inFlightFences)vkDestroyFence(device, inFlightFence, nullptr);
@@ -180,7 +199,7 @@ private:
         }
     }
 
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const {
         QueueFamilyIndices indices;
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -290,7 +309,7 @@ private:
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
         VkSurfaceFormatKHR surfaceFormat = swapChainSupport.formats[0];
-        VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        VkPresentModeKHR presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
         VkExtent2D extent = {WIDTH, HEIGHT};
 
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -668,7 +687,7 @@ private:
     }
 
     void createCommandBuffer() {
-        commandBuffers.resize(swapChainImages.size());
+        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -706,11 +725,8 @@ private:
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
         glm::mat4 model = myMesh.get_model_matrix();
-        model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
 
-        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 4.0f),
-                                 glm::vec3(0.0f, 0.0f, 0.0f),
-                                 glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
 
         glm::mat4 proj = glm::perspective(glm::radians(45.0f),
@@ -744,6 +760,8 @@ private:
     }
 
     void createSyncObjects() {
+        auto imageCount = static_cast<uint32_t>(swapChainImages.size());
+
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -751,19 +769,24 @@ private:
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        size_t imageCount = swapChainImages.size();
         imageAvailableSemaphores.resize(imageCount);
         renderFinishedSemaphores.resize(imageCount);
-        inFlightFences.resize(imageCount);
+        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
-        for (size_t i = 0; i < imageCount; i++) {
+        imagesInFlight.resize(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+
+        for (size_t i{0}; i < imageCount; i++) {
             if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-                vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-                vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create synchronization objects.");
-                }
+            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create semaphore.");
+            }
         }
-        imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
+
+        for (size_t i{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
+                throw std::runtime_error("Failed to create fence.");
+        }
+        imagesInFlight.resize(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
     }
 
 
@@ -797,10 +820,10 @@ private:
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
-        vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-        if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-            vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+        if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            throw std::runtime_error("Failed to acquire swap chain image!");
         }
 
         if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
@@ -826,7 +849,7 @@ private:
         submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
 
 
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[imageIndex]};
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -844,31 +867,104 @@ private:
 
         vkQueuePresentKHR(graphicsQueue, &presentInfo);
 
-        currentFrame = (currentFrame + 1) % swapChainImages.size();
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
     void build_cube() {
         myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{1.0f, 0.0f, 0.0f}});
         myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{1.0f, 0.0f, 0.0f}});
 
-        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 0.0f}});
-        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 1.0f}});
 
         myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 0.0f, 1.0f}});
         myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{0.0f, 0.0f, 1.0f}});
 
-        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 1.0f}});
-        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{1.0f, 1.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 1.0f, 0.0f}});
 
-        myMesh.add_triangle(Triangle{glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 1.0f, 0.0f}});
-        myMesh.add_triangle(Triangle{glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 1.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 0.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 0.0f, 1.0f}});
 
-        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{1.0f, 0.0f, 1.0f}});
-        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{1.0f, 0.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 0.0f}});
+    }
+
+    void update() {
+        const float cameraSpeed{2*deltaTime};
+
+        if (keys[GLFW_KEY_ESCAPE]) {
+            glfwSetWindowShouldClose(window, true);
+        }
+        if (keys[GLFW_KEY_W]) {
+            cameraPos += cameraSpeed * cameraFront;
+        }
+        if (keys[GLFW_KEY_S]) {
+            cameraPos -= cameraSpeed * cameraFront;
+        }
+
+        if (keys[GLFW_KEY_A]) {
+            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        }
+        if (keys[GLFW_KEY_D]) {
+            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        }
+
+        if (keys[GLFW_KEY_SPACE]) {
+            cameraPos += cameraSpeed * cameraUp;
+        }
+        if (keys[GLFW_KEY_LEFT_SHIFT]) {
+            cameraPos -= cameraSpeed * cameraUp;
+        }
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+
+        if (firstMouse) {
+            lastX = xpos;
+            lastY = ypos;
+            firstMouse = false;
+        }
+
+        float xoffset = xpos - lastX;
+        float yoffset = lastY - ypos;
+        lastX = xpos;
+        lastY = ypos;
+
+        float sensitivity = 0.1f;
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        yaw   += xoffset;
+        pitch += yoffset;
+
+        if (pitch > 89.0f) pitch = 89.0f;
+        if (pitch < -89.0f) pitch = -89.0f;
+
+        glm::vec3 front;
+        front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        front.y = sin(glm::radians(pitch));
+        front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+
+        cameraFront = glm::normalize(front);
     }
 
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
+            const auto currentFrameTime = static_cast<float>(glfwGetTime());
+            deltaTime = currentFrameTime - lastFrame;
+            lastFrame = currentFrameTime;
+
+            frameTimer += deltaTime;
+            frameCount++;
+
+            if (frameTimer >= 1.0f) {
+                uint32_t fps = std::floor(1.0f / deltaTime);
+                std::cout << "\rFPS: " << frameCount << "     " << std::flush;
+                glfwSetWindowTitle(window, std::to_string(fps).c_str());
+                frameCount = 0;
+                frameTimer = 0.0f;
+            }
+            update();
             glfwPollEvents();
             drawFrame();
         }
