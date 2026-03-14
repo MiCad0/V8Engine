@@ -12,33 +12,29 @@
 #include <vulkan/vulkan_core.h>
 #include "rect.h"
 
-class cube {
+class Cube {
 public:
-    cube() {faces.push_back(rect({ 0.5f, -0.5f,  0.5f}, {-0.5f, -0.5f,  0.5f},
+    Cube() {faces.push_back(Rect({ 0.5f, -0.5f,  0.5f}, {-0.5f, -0.5f,  0.5f},
                          { 0.5f,  0.5f,  0.5f}, {-0.5f,  0.5f,  0.5f}));
 
-        faces.push_back(rect({-0.5f, -0.5f, -0.5f}, { 0.5f, -0.5f, -0.5f},
+        faces.push_back(Rect({-0.5f, -0.5f, -0.5f}, { 0.5f, -0.5f, -0.5f},
                              {-0.5f,  0.5f, -0.5f}, { 0.5f,  0.5f, -0.5f}));
 
-        faces.push_back(rect({-0.5f, -0.5f,  0.5f}, {-0.5f, -0.5f, -0.5f},
+        faces.push_back(Rect({-0.5f, -0.5f,  0.5f}, {-0.5f, -0.5f, -0.5f},
                              {-0.5f,  0.5f,  0.5f}, {-0.5f,  0.5f, -0.5f}));
 
-        faces.push_back(rect({ 0.5f, -0.5f, -0.5f}, { 0.5f, -0.5f,  0.5f},
+        faces.push_back(Rect({ 0.5f, -0.5f, -0.5f}, { 0.5f, -0.5f,  0.5f},
                              { 0.5f,  0.5f, -0.5f}, { 0.5f,  0.5f,  0.5f}));
 
-        faces.push_back(rect({ 0.5f, -0.5f, -0.5f}, {-0.5f, -0.5f, -0.5f},
+        faces.push_back(Rect({ 0.5f, -0.5f, -0.5f}, {-0.5f, -0.5f, -0.5f},
                              { 0.5f, -0.5f,  0.5f}, {-0.5f, -0.5f,  0.5f}));
 
-        faces.push_back(rect({-0.5f,  0.5f, -0.5f}, { 0.5f,  0.5f, -0.5f},
+        faces.push_back(Rect({-0.5f,  0.5f, -0.5f}, { 0.5f,  0.5f, -0.5f},
                              {-0.5f,  0.5f,  0.5f}, { 0.5f,  0.5f,  0.5f}));
     }
 
     glm::vec3 position{0.0f, 0.0f, 0.0f};
     glm::vec3 rotation{0.0f, 0.0f, 0.0f};
-
-    void move_for(const glm::vec3 dir) {
-        position += dir;
-    }
 
     glm::mat4 get_model_matrix() {
         return glm::translate(glm::mat4(1.0f), position);
@@ -82,7 +78,7 @@ public:
     }
 
 private:
-    std::vector<rect> faces;
+    std::vector<Rect> faces;
 };
 
 

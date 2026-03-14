@@ -1,14 +1,12 @@
 //
-// Created by MiCad0 on 13/03/2026.
+// Created by micad0 on 14/03/2026.
 //
 
-#ifndef V8ENGINE_RECT_H
-#define V8ENGINE_RECT_H
-#include <array>
+#ifndef V8ENGINE_TRIANGLE_H
+#define V8ENGINE_TRIANGLE_H
 #include <vector>
-#include <glm/glm.hpp>
-#include <vulkan/vulkan_core.h>
-
+#include <glm/vec3.hpp>
+#include <glm/ext/matrix_transform.hpp>
 
 struct Vertex {
     glm::vec3 pos;
@@ -38,47 +36,37 @@ struct Vertex {
     }
 };
 
-class rect {
+class Triangle {
 public:
-    rect(): vertices{
-        {{-0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-        {{ 0.5f,  0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}},
-        {{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}}
-    } {}
-    rect(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const glm::vec3 d): vertices{{a, {1.0f, 1.0f, 1.0f}}, {b,{1.0f, 1.0f, 1.0f}}, {c,{1.0f, 1.0f, 1.0f}}, {d, {1.0f, 1.0f, 1.0f}}} {}
+    Triangle(): vertices{
+        {{ 0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.5f,  0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f,  0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
+    }{}
+    Triangle(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 color):vertices{
+        {a, color},
+        {b, color},
+        {c, color}
+    }{}
 
-    void move_to(const glm::vec3 dest) {
-        const auto dir = dest - vertices[0].pos;
-        for (auto& v : vertices) {
-            v.pos += dir;
-        }
-    }
+    glm::vec3 position{0.0f, 0.0f, 0.0f};
+    glm::vec3 rotation{0.0f, 0.0f, 0.0f};
 
-    void move_for(const glm::vec3 dir) {
-        for (auto& v : vertices) {
-            v.pos += dir;
-        }
+
+    [[nodiscard]] glm::mat4 get_model_matrix() const {
+        return glm::translate(glm::mat4(1.0f), position);
     }
 
     std::vector<Vertex> get_vertices() {
         return vertices;
     }
 
-    static std::vector<uint32_t> get_indices(const uint32_t i) {
-        if (i == 0) {
-            return std::vector<uint32_t>{0,1,2};
-        }
-        return std::vector<uint32_t>{1,2,3};
+    [[nodiscard]] size_t get_vertex_count() const {
+        return vertices.size();
     }
-
-    static std::vector<uint32_t> get_all_indices(const uint32_t i) {
-        return std::vector<uint32_t>{0,2,1,1,2,3};
-    }
-
 private:
     std::vector<Vertex> vertices;
 };
 
 
-#endif //V8ENGINE_RECT_H
+#endif //V8ENGINE_TRIANGLE_H

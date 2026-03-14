@@ -11,8 +11,10 @@ file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
         DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 add_executable(V8Engine main.cpp
-        rect.h
-        cube.h
+        unused/rect.h
+        unused/cube.h
+        triangle.h
+        mesh.h
 )
 
 target_link_libraries(V8Engine PRIVATE

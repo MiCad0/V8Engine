@@ -3,6 +3,7 @@
 //
 
 #define GLFW_INCLUDE_VULKAN
+#include <array>
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <stdexcept>
@@ -10,8 +11,7 @@
 #include <cstring>
 #include <optional>
 #include <vector>
-#include "rect.h"
-#include "cube.h"
+#include "mesh.h"
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -37,7 +37,7 @@ struct SimplePushConstantData {
     glm::mat4 mvp;
 };
 
-class HelloVulkanTriangle {
+class Engine {
 public:
     void run() {
         initWindow();
@@ -51,7 +51,7 @@ private:
     VkInstance instance;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
-    cube monCube;
+    Mesh myMesh;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device;
     VkQueue graphicsQueue;
@@ -94,26 +94,10 @@ private:
 
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
     {
-        auto app = reinterpret_cast<HelloVulkanTriangle*>(glfwGetWindowUserPointer(window));
+        auto app = reinterpret_cast<Engine*>(glfwGetWindowUserPointer(window));
         if (app && key >= 0 && key < GLFW_KEY_LAST) {
             if (action == GLFW_PRESS) app->keys[key] = true;
             else if (action == GLFW_RELEASE) app->keys[key] = false;
-        }
-    }
-
-    void move_rect() {
-        const float speed = 0.005f;
-        if (keys[GLFW_KEY_D]) {
-            rectOffset.x += speed;
-        }
-        if (keys[GLFW_KEY_A]) {
-            rectOffset.x -= speed;
-        }
-        if (keys[GLFW_KEY_W]) {
-            rectOffset.y += speed;
-        }
-        if (keys[GLFW_KEY_S]) {
-            rectOffset.y -= speed;
         }
     }
 
@@ -130,6 +114,7 @@ private:
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPool();
+        build_cube();
         createVertexBuffer();
         createCommandBuffer();
         createSyncObjects();
@@ -365,7 +350,7 @@ private:
     }
 
     void createVertexBuffer() {
-        auto vertices = monCube.get_vertices();
+        auto vertices = myMesh.get_vertices();
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -720,12 +705,13 @@ private:
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        glm::mat4 model = monCube.get_model_matrix();
+        glm::mat4 model = myMesh.get_model_matrix();
         model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
 
         glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 4.0f),
                                  glm::vec3(0.0f, 0.0f, 0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
+
 
         glm::mat4 proj = glm::perspective(glm::radians(45.0f),
                                       swapChainExtent.width / (float) swapChainExtent.height,
@@ -749,7 +735,7 @@ private:
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-        vkCmdDraw(commandBuffer, static_cast<uint32_t>(monCube.get_vertex_count()), 1, 0, 0);
+        vkCmdDraw(commandBuffer, static_cast<uint32_t>(myMesh.get_vertex_count()), 1, 0, 0);
         vkCmdEndRenderPass(commandBuffer);
 
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -861,10 +847,29 @@ private:
         currentFrame = (currentFrame + 1) % swapChainImages.size();
     }
 
+    void build_cube() {
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{1.0f, 0.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{1.0f, 0.0f, 0.0f}});
+
+        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 0.0f}});
+
+        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 0.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{0.0f, 0.0f, 1.0f}});
+
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{0.0f, 1.0f, 1.0f}});
+
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 1.0f, 0.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, 0.5f, 0.5f},glm::vec3{-0.5f, 0.5f, -0.5f},glm::vec3{0.5f, 0.5f, -0.5f},glm::vec3{1.0f, 1.0f, 0.0f}});
+
+        myMesh.add_triangle(Triangle{glm::vec3{-0.5f, -0.5f, 0.5f},glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{1.0f, 0.0f, 1.0f}});
+        myMesh.add_triangle(Triangle{glm::vec3{0.5f, -0.5f, 0.5f},glm::vec3{0.5f, -0.5f, -0.5f},glm::vec3{-0.5f, -0.5f, -0.5f},glm::vec3{1.0f, 0.0f, 1.0f}});
+    }
+
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
-            move_rect();
             drawFrame();
         }
         vkDeviceWaitIdle(device);
@@ -873,7 +878,7 @@ private:
 
 
 int main() {
-    HelloVulkanTriangle app;
+    Engine app;
 
 
     try {
