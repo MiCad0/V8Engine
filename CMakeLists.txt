@@ -2,19 +2,19 @@ cmake_minimum_required(VERSION 4.1)
 project(V8Engine)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(glm REQUIRED)
 
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 add_executable(V8Engine main.cpp
         unused/rect.h
         unused/cube.h
         triangle.h
         mesh.h
+        camera.h
 )
 
 target_link_libraries(V8Engine PRIVATE
@@ -26,7 +26,7 @@ find_program(GLSLC_EXECUTABLE glslc)
 
 if(GLSLC_EXECUTABLE)
     set(SHADER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-    set(SHADER_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
+    set(SHADER_BIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
     file(MAKE_DIRECTORY ${SHADER_BIN_DIR})
 
     add_custom_command(
@@ -40,6 +40,7 @@ if(GLSLC_EXECUTABLE)
             COMMAND ${GLSLC_EXECUTABLE} ${SHADER_SRC_DIR}/shader.frag -o ${SHADER_BIN_DIR}/frag.spv
             DEPENDS ${SHADER_SRC_DIR}/shader.frag
     )
+
 
     add_custom_target(CompileShaders ALL DEPENDS ${SHADER_BIN_DIR}/vert.spv ${SHADER_BIN_DIR}/frag.spv)
 

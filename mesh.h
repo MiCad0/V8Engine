@@ -6,48 +6,32 @@
 #define V8ENGINE_MESH_H
 
 #include <vector>
-#include <glm/vec3.hpp>
-#include <glm/ext/matrix_transform.hpp>
 #include "triangle.h"
 
 class Mesh {
 public:
     Mesh() = default;
 
-    void add_triangle(const Triangle& t) {
-        triangles.push_back(t);
-    }
+    [[nodiscard]] const std::vector<Vertex>& get_vertices() const { return vertices; }
+    [[nodiscard]] const std::vector<uint32_t>& get_opaque_indices() const { return opaqueIndices; }
+    [[nodiscard]] const std::vector<uint32_t>& get_transparent_indices() const { return transparentIndices; }
 
-    glm::vec3 position{0.0f, 0.0f, 0.0f};
-    glm::vec3 rotation{0.0f, 0.0f, 0.0f};
+    [[nodiscard]] size_t get_vertex_count() const { return vertices.size(); }
+    [[nodiscard]] size_t get_opaque_index_count() const { return opaqueIndices.size(); }
+    [[nodiscard]] size_t get_transparent_index_count() const { return transparentIndices.size(); }
 
-    [[nodiscard]] glm::mat4 get_model_matrix() const {
-        glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
+    [[nodiscard]] glm::mat4 get_model_matrix() const { return modelMatrix; }
+    void set_model_matrix(const glm::mat4& matrix) { modelMatrix = matrix; }
 
-        model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
-
-        return model;
-    }
-
-    std::vector<Vertex> get_vertices() {
-        std::vector<Vertex> all_vertices;
-        all_vertices.reserve(triangles.size() * 3);
-
-        for (auto& t : triangles) {
-            auto v = t.get_vertices();
-            all_vertices.insert(all_vertices.end(), v.begin(), v.end());
-        }
-        return all_vertices;
-    }
-
-    [[nodiscard]] size_t get_vertex_count() const {
-        return triangles.size() * 3;
-    }
+    void set_vertices(const std::vector<Vertex>& new_vertices) { vertices = new_vertices; }
+    void set_opaque_indices(const std::vector<uint32_t>& new_indices) { opaqueIndices = new_indices; }
+    void set_transparent_indices(const std::vector<uint32_t>& new_indices) { transparentIndices = new_indices; }
 
 private:
-    std::vector<Triangle> triangles;
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> opaqueIndices;
+    std::vector<uint32_t> transparentIndices;
+    glm::mat4 modelMatrix{1.0f};
 };
 
 #endif //V8ENGINE_MESH_H
