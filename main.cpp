@@ -215,6 +215,8 @@ private:
             vkDestroyBuffer(device, transparentIndexBuffer, nullptr);
             vkFreeMemory(device, transparentIndexBufferMemory, nullptr);
         }
+        vkDestroyBuffer(device, instanceBuffer, nullptr);
+        vkFreeMemory(device, instanceBufferMemory, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
         vkDestroyImageView(device, depthImageView, nullptr);
