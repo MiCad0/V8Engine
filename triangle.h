@@ -14,9 +14,10 @@ struct Vertex {
     glm::vec3 pos;
     glm::vec3 normal;
     glm::vec4 color;
+    glm::vec2 uv;
 
     bool operator==(const Vertex& other) const {
-        return pos == other.pos && color == other.color && normal == other.normal;
+        return pos == other.pos && color == other.color && normal == other.normal && uv == other.uv;
     }
 
     static VkVertexInputBindingDescription getBindingDescription() {
@@ -27,8 +28,9 @@ struct Vertex {
         return bindingDescription;
     }
 
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
+
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
         attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -44,6 +46,11 @@ struct Vertex {
         attributeDescriptions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
         attributeDescriptions[2].offset = offsetof(Vertex, color);
 
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(Vertex, uv);
+
         return attributeDescriptions;
     }
 };
@@ -51,7 +58,7 @@ struct Vertex {
 
 template<> struct std::hash<Vertex> {
     size_t operator()(Vertex const& vertex) const noexcept {
-        return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^ (hash<glm::vec3>()(vertex.color));
+        return (((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^ (hash<glm::vec3>()(vertex.color)) ^ (hash<glm::vec2>()(vertex.uv) << 1));
     }
 };
 

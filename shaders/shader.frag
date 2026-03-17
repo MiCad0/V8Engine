@@ -4,20 +4,26 @@ layout(location = 0) in vec3 fragNormal;
 layout(location = 1) in vec4 fragColor;
 layout(location = 2) in vec3 fragLightDir;
 layout(location = 3) in vec3 viewVec;
+layout(location = 4) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
+layout(binding = 1) uniform sampler2D texSampler;
+
 void main() {
+    vec4 texColor = texture(texSampler, fragTexCoord);
+    vec3 baseColor = texColor.rgb * fragColor.rgb;
+
     vec3 normal = normalize(fragNormal);
     vec3 lightDir = normalize(fragLightDir);
     vec3 view = normalize(viewVec);
     vec3 reflect = reflect(-lightDir, normal);
 
     float ambientIntensity = 0.15;
-    vec3 ambient = ambientIntensity * fragColor.rgb;
+    vec3 ambient = ambientIntensity * baseColor;
 
     float diff = max(dot(normal, lightDir), 0.0);
-    vec3 diffuse = diff * fragColor.rgb;
+    vec3 diffuse = diff * baseColor;
 
     float specularStrength = 0.5;
     float spec = pow(max(dot(view, reflect), 0.0), 32.0);

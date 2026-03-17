@@ -7,6 +7,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 find_package(Vulkan REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(glm REQUIRED)
+include(FetchContent)
+FetchContent_Declare(
+        fastgltf
+        GIT_REPOSITORY https://github.com/spnda/fastgltf.git
+        GIT_TAG        v0.8.0
+)
+FetchContent_MakeAvailable(fastgltf)
 
 
 add_executable(V8Engine main.cpp
@@ -15,11 +22,14 @@ add_executable(V8Engine main.cpp
         triangle.h
         mesh.h
         camera.h
+        gltfModel.h
+        stb_image.h
 )
 
 target_link_libraries(V8Engine PRIVATE
         Vulkan::Vulkan
         glfw
+        fastgltf::fastgltf
 )
 
 find_program(GLSLC_EXECUTABLE glslc)
